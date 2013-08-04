@@ -707,10 +707,7 @@ recipe* game::select_crafting_recipe()
 
                         if (charges > 0)
                         {
-                            char* buf = new char[32];
-                            sprintf(buf, _("(%d charges) "), charges);
-                            toolinfo << buf;
-                            delete buf; buf = NULL;
+                            toolinfo << string_format(_("(%d charges) "), charges);
                         }
                         std::string toolname = toolinfo.str();
                         if (xpos + utf8_width(toolname.c_str()) >= FULL_SCREEN_WIDTH)
@@ -961,19 +958,21 @@ void game::pick_recipes(std::vector<recipe*> &current,
 
 void game::add_known_recipes(std::vector<recipe*> &current, recipe_list source, std::string filter)
 {
+    std::vector<recipe*> can_craft;
     for (recipe_list::iterator iter = source.begin(); iter != source.end(); ++iter)
     {
-        if (u.knows_recipe(*iter))
+        if (u.knows_recipe(*iter) && (*iter)->difficulty >= 0)
         {
-            if ((*iter)->difficulty >= 0 )
+            if (filter == "" || item_controller->find_template((*iter)->result)->name.find(filter) != std::string::npos)
             {
-                if (filter == "" || item_controller->find_template((*iter)->result)->name.find(filter) != std::string::npos)
-                {
+                if (OPTIONS[OPT_SORT_CRAFTING] && can_make(*iter))
+                    can_craft.push_back(*iter);
+                else
                     current.push_back(*iter);
-                }
             }
         }
     }
+    current.insert(current.begin(),can_craft.begin(),can_craft.end());
 }
 
 void game::make_craft(recipe *making)
@@ -1131,11 +1130,11 @@ void game::complete_craft()
   if (iter == inv_chars.size() || u.volume_carried()+newit.volume() > u.volume_capacity()) {
    add_msg(_("There's no room in your inventory for the %s, so you drop it."),
              newit.tname().c_str());
-   m.add_item(u.posx, u.posy, newit, MAX_ITEM_IN_SQUARE);
+   m.add_item_or_charges(u.posx, u.posy, newit);
   } else if (u.weight_carried() + newit.volume() > u.weight_capacity()) {
    add_msg(_("The %s is too heavy to carry, so you drop it."),
            newit.tname().c_str());
-   m.add_item(u.posx, u.posy, newit, MAX_ITEM_IN_SQUARE);
+   m.add_item_or_charges(u.posx, u.posy, newit);
   } else {
    newit = u.i_add(newit);
    add_msg("%c - %s", newit.invlet, newit.tname().c_str());
@@ -1494,6 +1493,20 @@ void game::disassemble(char ch)
             }
         }
     }
+    //if we're trying to disassemble a book or magazine
+    if(dis_item->is_book())
+    {
+       if (OPTIONS[OPT_QUERY_DISASSEMBLE] && !(query_yn(_("Do you want to tear %s into pages?"), dis_item->tname(this).c_str())))
+             return;
+        else
+        {
+            //twice the volume then multiplied by 10 (a book with volume 3 will give 60 pages)
+            int num_pages = (dis_item->volume() *2) * 10;
+            m.spawn_item(u.posx,u.posy,"paper", 0, 1, num_pages);
+            u.inv.remove_item(dis_item);
+        }
+        return;
+    }
     // no recipe exists, or the item cannot be disassembled
     add_msg(_("This item cannot be disassembled!"));
 }
@@ -1514,7 +1527,7 @@ void game::complete_disassemble()
       if (ammodrop.made_of(LIQUID))
         handle_liquid(ammodrop, false, false);
       else
-        m.add_item(u.posx, u.posy, ammodrop, MAX_ITEM_IN_SQUARE);
+        m.add_item_or_charges(u.posx, u.posy, ammodrop);
     }
     if (dis_item->is_tool() && dis_item->charges > 0 && dis_item->ammo_type() != "NULL")
     {
@@ -1527,7 +1540,7 @@ void game::complete_disassemble()
       if (ammodrop.made_of(LIQUID))
         handle_liquid(ammodrop, false, false);
       else
-        m.add_item(u.posx, u.posy, ammodrop, MAX_ITEM_IN_SQUARE);
+        m.add_item_or_charges(u.posx, u.posy, ammodrop);
     }
     u.i_rem(u.activity.values[0]);  // remove the item
 
@@ -1584,7 +1597,7 @@ void game::complete_disassemble()
           } else
           {
             if (dis->difficulty == 0 || comp_success)
-              m.add_item(u.posx, u.posy, newit, MAX_ITEM_IN_SQUARE);
+              m.add_item_or_charges(u.posx, u.posy, newit);
             else
               add_msg(_("You fail to recover a component."));
             compcount--;

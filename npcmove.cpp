@@ -1397,7 +1397,7 @@ void npc::drop_items(game *g, int weight, int volume)
    item_name << dropped.tname();
   else if (num_items_dropped == 2)
    item_name << _(" and ") << dropped.tname();
-  g->m.add_item(posx, posy, dropped);
+  g->m.add_item_or_charges(posx, posy, dropped);
  }
 // Finally, describe the action if u can see it
  std::string item_name_str = item_name.str();
@@ -1551,9 +1551,19 @@ void npc::alt_attack(game *g, int target)
    moves -= 125;
    if (g->u_see(posx, posy))
     g->add_msg(_("%s throws a %s."), name.c_str(), used->tname().c_str());
-   g->throw_item(*this, tarx, tary, *used, trajectory);
-   i_remn(invlet);
 
+   int stack_size = -1;
+   if( used->count_by_charges() ) {
+       stack_size = used->charges;
+       used->charges = 1;
+   }
+   g->throw_item(*this, tarx, tary, *used, trajectory);
+   // Throw a single charge of a stacking object.
+   if( stack_size == -1 || stack_size == 1 ) {
+       i_remn(invlet);
+   } else {
+       used->charges = stack_size - 1;
+   }
   } else if (!wont_hit_friend(g, tarx, tary, invlet)) {// Danger of friendly fire
 
    if (!used->active || used->charges > 2) // Safe to hold on to, for now
@@ -1603,7 +1613,21 @@ void npc::alt_attack(game *g, int target)
     moves -= 125;
     if (g->u_see(posx, posy))
      g->add_msg(_("%s throws a %s."), name.c_str(), used->tname().c_str());
+
+    int stack_size = -1;
+    if( used->count_by_charges() ) {
+        stack_size = used->charges;
+        used->charges = 1;
+    }
     g->throw_item(*this, tarx, tary, *used, trajectory);
+
+    // Throw a single charge of a stacking object.
+    if( stack_size == -1 || stack_size == 1 ) {
+        i_remn(invlet);
+    } else {
+        used->charges = stack_size - 1;
+    }
+
     i_remn(invlet);
    }
 
@@ -1676,7 +1700,7 @@ void npc::heal_player(game *g, player &patient)
   else
    g->add_msg(_("Someone heals you."));
 
-  int amount_healed;
+  int amount_healed = 0;
   if (has_amount("1st_aid", 1)) {
    switch (worst) {
     case hp_head:  amount_healed = 10 + 1.6 * skillLevel("firstaid"); break;
@@ -1726,7 +1750,7 @@ void npc::heal_self(game *g)
   }
  }
 
- int amount_healed;
+ int amount_healed = 0;
  if (has_amount("1st_aid", 1)) {
   switch (worst) {
    case hp_head:  amount_healed = 10 + 1.6 * skillLevel("firstaid"); break;

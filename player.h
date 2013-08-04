@@ -60,7 +60,7 @@ public:
 
  void disp_info(game *g);	// '@' key; extended character info
  void disp_morale(game *g);		// '%' key; morale info
- void disp_status(WINDOW* w, game *g = NULL);// On-screen data
+ void disp_status(WINDOW* w, WINDOW *w2, game *g = NULL);// On-screen data
 
  void reset(game *g = NULL);// Resets movement points, stats, applies effects
  void action_taken(); // Called after every action, invalidates player caches.
@@ -146,7 +146,7 @@ public:
 
  int  dodge(game *g);     // Returns the players's dodge, modded by clothing etc
  int  dodge_roll(game *g);// For comparison to hit_roll()
- 
+
  bool uncanny_dodge(bool is_u = true);      // Move us to an adjacent_tile() if available. Display message if player is dodging.
  point adjacent_tile();     // Returns an unoccupied, safe adjacent point. If none exists, returns player position.
 
@@ -199,7 +199,7 @@ public:
  bool has_addiction(add_type type) const;
  int  addiction_level(add_type type);
 
- void siphon_gas(game *g, vehicle *veh);
+ void siphon(game *g, vehicle *veh, ammotype desired_liquid);
  void cauterize(game *g);
  void suffer(game *g);
  void mend(game *g);

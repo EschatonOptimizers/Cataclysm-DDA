@@ -41,7 +41,7 @@ static void add_or_drop_item(game *g, player *p, item *it)
   if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
     drop = true;
   if (drop)
-    g->m.add_item(p->posx, p->posy, replacement);
+    g->m.add_item_or_charges(p->posx, p->posy, replacement);
   else
     p->i_add(replacement, g);
 }
@@ -60,12 +60,10 @@ static bool use_fire(game *g, player *p, item *it)
 // Returns false if the inscription failed or if the player canceled the action. Otherwise, returns true.
 static bool inscribe_item( game *g, player *p, std::string verb, std::string gerund, bool carveable )
 {
-    //Note: this part still strongly relies on English grammar. 
+    //Note: this part still strongly relies on English grammar.
     //Although it can be easily worked around in language like Chinese,
     //but might need to be reworked for some European languages that have more verb forms
-    char buf[512];
-    sprintf(buf, _("%s on what?"), verb.c_str());
-    char ch = g->inv(buf);
+    char ch = g->inv(string_format(_("%s on what?"), verb.c_str()));
     item* cut = &(p->i_at(ch));
     if (cut->type->id == "null")
     {
@@ -84,16 +82,21 @@ static bool inscribe_item( game *g, player *p, std::string verb, std::string ger
                       cut->made_of("silver"))) {
         std::string lower_verb = verb;
         std::transform(lower_verb.begin(), lower_verb.end(), lower_verb.begin(), ::tolower);
+        std::string mat = cut->get_material(1);
+        material_type* mt = material_type::find_material(mat);
+        std::string mtname = "null";
+        if(mt!=NULL) {
+            mtname = mt->name();
+        }
+        std::transform(mtname.begin(), mtname.end(), mtname.begin(), ::tolower);
         g->add_msg(_("You can't %1$s an item made of %2$s!"),
-                   lower_verb.c_str(), cut->get_material(1).c_str());
+                   lower_verb.c_str(), mtname.c_str());
         return false;
     }
 
     std::map<std::string, std::string>::iterator ent = cut->item_vars.find("item_note");
-    sprintf(buf, _("%1$s on this %2$s is a note saying: "), gerund.c_str(), cut->type->name.c_str());
-    std::string message = buf;
-    sprintf(buf, _("%s what?"), verb.c_str()); 
-    message = string_input_popup(buf, 64, (ent != cut->item_vars.end() ?
+    std::string message = string_format(_("%1$s on this %2$s is a note saying: "), gerund.c_str(), cut->type->name.c_str());
+    message = string_input_popup(string_format(_("%s what?"), verb.c_str()), 64, (ent != cut->item_vars.end() ?
                                                        cut->item_vars["item_note"] : message ));
 
     if( message.size() > 0 ) { cut->item_vars["item_note"] = message; }
@@ -949,12 +952,12 @@ void iuse::sew(game *g, player *p, item *it, bool t)
     if (fix->made_of("leather"))
     {
         repair_items.push_back("leather");
-        plurals.push_back(_("<plural>leather"));
+        plurals.push_back(rm_prefix(_("<plural>leather")));
     }
     if (fix->made_of("fur"))
     {
         repair_items.push_back("fur");
-        plurals.push_back(_("<plural>fur"));
+        plurals.push_back(rm_prefix(_("<plural>fur")));
     }
     if(repair_items.empty())
 	{
@@ -983,7 +986,7 @@ void iuse::sew(game *g, player *p, item *it, bool t)
     {
         for(unsigned int i = 0; i< repair_items.size(); i++)
         {
-            g->add_msg_if_player(p,_("You don't have enough %s to do that."), plurals[i].substr(8).c_str()); // remove <plural> tag
+            g->add_msg_if_player(p,_("You don't have enough %s to do that."), plurals[i].c_str());
         }
         it->charges++;
         return;
@@ -1180,7 +1183,7 @@ void iuse::scissors(game *g, player *p, item *it, bool t)
     {
         scrap_text = _("You clumsily cut the %s into useless ribbons.");
         sliced_text = ngettext("You slice the %s into a rag.", "You slice the %1$s into %2$d rags.", count);
-        type = "rag"; 
+        type = "rag";
     }
     else
     {
@@ -1211,7 +1214,7 @@ void iuse::scissors(game *g, player *p, item *it, bool t)
         if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
             drop = true;
         if (drop)
-            g->m.add_item(p->posx, p->posy, result);
+            g->m.add_item_or_charges(p->posx, p->posy, result);
         else
             p->i_add(result, g);
     }
@@ -1667,7 +1670,7 @@ void iuse::two_way_radio(game *g, player *p, item *it, bool t)
 //       > Respond to the SOS of an NPC
 //       > Report something to a faction
 //       > Call another player
- fold_and_print(w, 1, 1, 999, c_white, 
+ fold_and_print(w, 1, 1, 999, c_white,
 _(
 "1: Radio a faction for help...\n"
 "2: Call Acquaintance...\n"
@@ -2013,13 +2016,13 @@ void iuse::picklock(game *g, player *p, item *it, bool t)
  std::string door_name;
  ter_id new_type;
  if (type == t_chaingate_l) {
-   door_name = _("<door_name>gate");
+   door_name = rm_prefix(_("<door_name>gate"));
    new_type = t_chaingate_c;
  } else if (type == t_door_locked || type == t_door_locked_alarm || type == t_door_locked_interior) {
-   door_name = _("<door_name>door");
+   door_name = rm_prefix(_("<door_name>door"));
    new_type = t_door_c;
  } else if (type == t_door_bar_locked) {
-   door_name = _("<door_name>door");
+   door_name = rm_prefix(_("<door_name>door"));
    new_type = t_door_bar_o;
    g->add_msg_if_player(p, _("The door swings open..."));
  } else {
@@ -2033,18 +2036,18 @@ void iuse::picklock(game *g, player *p, item *it, bool t)
  int door_roll = dice(4, 30);
  if (pick_roll >= door_roll) {
   p->practice(g->turn, "mechanics", 1);
-  g->add_msg_if_player(p,_("With a satisfying click, the lock on the %s opens."), door_name.substr(11).c_str());
+  g->add_msg_if_player(p,_("With a satisfying click, the lock on the %s opens."), door_name.c_str());
   g->m.ter_set(dirx, diry, new_type);
  } else if (door_roll > (1.5 * pick_roll) && it->damage < 100) {
   it->damage++;
 
-  std::string sStatus = _("<door_status>damage");
+  std::string sStatus = rm_prefix(_("<door_status>damage"));
   if (it->damage >= 5) {
-   sStatus = _("<door_status>destroy");
+   sStatus = rm_prefix(_("<door_status>destroy"));
    it->invlet = 0; // no copy to inventory in player.cpp:4472 ->
   }
 
-  g->add_msg_if_player(p,"The lock stumps your efforts to pick it, and you %s your tool.", sStatus.substr(13).c_str());
+  g->add_msg_if_player(p,"The lock stumps your efforts to pick it, and you %s your tool.", sStatus.c_str());
  } else {
   g->add_msg_if_player(p,_("The lock stumps your efforts to pick it."));
  }
@@ -2165,6 +2168,9 @@ void iuse::crowbar(game *g, player *p, item *it, bool t)
      g->add_msg_if_player(p,_("You break the glass."));
      g->sound(dirx, diry, 24, _("glass breaking!"));
      g->m.ter_set(dirx, diry, t_window_frame);
+     g->m.spawn_item(dirx, diry, "sheet", 0, 2);
+     g->m.spawn_item(dirx, diry, "stick", 0);
+     g->m.spawn_item(dirx, diry, "string_36", 0);
      return;
     }
    }
@@ -2206,7 +2212,7 @@ void iuse::siphon(game *g, player *p, item *it, bool t)
         g->add_msg_if_player(p, _("That vehicle has no fuel to siphon."));
         return;
     }
-    p->siphon_gas(g, veh);
+    p->siphon(g, veh, "gasoline");
     p->moves -= 200;
     return;
 }
@@ -2358,10 +2364,7 @@ if(it->type->id == "cot"){
   message << (buried ? _("You bury the beartrap.") : _("You set the beartrap.")) ;
   practice = (buried ? 7 : 4);
  } else if(it->type->id == "board_trap"){
-  char* buf = new char[256];
-  sprintf(buf, "You set the board trap on the %s, nails facing up.", g->m.tername(posx, posy).c_str());
-  message << buf;
-  delete buf; buf=NULL;
+  message << string_format("You set the board trap on the %s, nails facing up.", g->m.tername(posx, posy).c_str());
   type = tr_nailboard;
   practice = 2;
   } else if(it->type->id == "funnel"){
@@ -2875,16 +2878,13 @@ void iuse::firecracker_pack(game *g, player *p, item *it, bool t)
  wborder(w, LINE_XOXO, LINE_XOXO, LINE_OXOX, LINE_OXOX,
               LINE_OXXO, LINE_OOXX, LINE_XXOO, LINE_XOOX );
  int mid_x = getmaxx(w) / 2;
+ int tmpx = 5;
  mvwprintz(w, 1, 2, c_white,  _("How many do you want to light? (1-%d)"), it->charges);
  mvwprintz(w, 2, mid_x, c_white, "1");
- mvwprintz(w, 3, 5, c_ltred, "I");
- mvwprintz(w, 3, 6, c_white, std::string(_("<I>ncrease")).substr(3).c_str()); //<I> makes more sense to translators, same below
- mvwprintz(w, 3, 14, c_ltred, "D");
- mvwprintz(w, 3, 15, c_white, std::string(_("<D>ecrease")).substr(3).c_str());
- mvwprintz(w, 3, 23, c_ltred, "A");
- mvwprintz(w, 3, 24, c_white, std::string(_("<A>ccept")).substr(3).c_str());
- mvwprintz(w, 3, 30, c_ltred, "C");
- mvwprintz(w, 3, 31, c_white, std::string(_("<C>ancel")).substr(3).c_str());
+ tmpx += shortcut_print(w, 3, tmpx, c_white, c_ltred, _("<I>ncrease"))+1;
+ tmpx += shortcut_print(w, 3, tmpx, c_white, c_ltred, _("<D>ecrease"))+1;
+ tmpx += shortcut_print(w, 3, tmpx, c_white, c_ltred, _("<A>ccept"))+1;
+ tmpx += shortcut_print(w, 3, tmpx, c_white, c_ltred, _("<C>ancel"))+1;
  wrefresh(w);
  bool close = false;
  int charges = 1;
@@ -3417,7 +3417,7 @@ void iuse::knife(game *g, player *p, item *it, bool t)
                     if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
                     drop = true;
                     if (drop)
-                    g->m.add_item(p->posx, p->posy, result);
+                    g->m.add_item_or_charges(p->posx, p->posy, result);
                     else
                     p->i_add(result);
                 }
@@ -3448,7 +3448,7 @@ void iuse::knife(game *g, player *p, item *it, bool t)
                     if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
                     drop = true;
                     if (drop)
-                    g->m.add_item(p->posx, p->posy, result);
+                    g->m.add_item_or_charges(p->posx, p->posy, result);
                     else
                     p->i_add(result);
                 }
@@ -3487,7 +3487,7 @@ void iuse::knife(game *g, player *p, item *it, bool t)
                     if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
                     drop = true;
                     if (drop)
-                    g->m.add_item(p->posx, p->posy, skewer);
+                    g->m.add_item_or_charges(p->posx, p->posy, skewer);
                     else
                     p->i_add(skewer);
                 }
@@ -3542,7 +3542,7 @@ void iuse::cut_log_into_planks(game *g, player *p, item *it)
             drop = true;
         }
         if (drop) {
-            g->m.add_item(p->posx, p->posy, plank);
+            g->m.add_item_or_charges(p->posx, p->posy, plank);
         } else {
             p->i_add(plank);
         }
@@ -3557,7 +3557,7 @@ void iuse::cut_log_into_planks(game *g, player *p, item *it)
         if (!drop && (iter == inv_chars.size() || p->volume_carried() >= p->volume_capacity()))
             drop = true;
         if (drop)
-            g->m.add_item(p->posx, p->posy, scrap);
+            g->m.add_item_or_charges(p->posx, p->posy, scrap);
         else
             p->i_add(scrap);
     }
@@ -3970,7 +3970,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
       p->volume_carried() + casing.volume() < p->volume_capacity() && iter < inv_chars.size()) {
     p->i_add(casing);}
     else
-   g->m.add_item(p->posx, p->posy, casing);}
+   g->m.add_item_or_charges(p->posx, p->posy, casing);}
  if (primer.type->id != "null"){
  primer.charges = multiply;
  int iter = 0;
@@ -3982,7 +3982,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
       p->volume_carried() + primer.volume() < p->volume_capacity() && iter < inv_chars.size()) {
     p->i_add(primer);}
     else
-   g->m.add_item(p->posx, p->posy, primer);}
+   g->m.add_item_or_charges(p->posx, p->posy, primer);}
  int iter = 0;
    while ((gunpowder.invlet == 0 || p->has_item(gunpowder.invlet)) && iter < inv_chars.size()) {
     gunpowder.invlet = g->nextinv;
@@ -3992,7 +3992,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
       p->volume_carried() + gunpowder.volume() < p->volume_capacity() && iter < inv_chars.size()) {
     p->i_add(gunpowder);}
     else
-   g->m.add_item(p->posx, p->posy, gunpowder);
+   g->m.add_item_or_charges(p->posx, p->posy, gunpowder);
  iter = 0;
    while ((lead.invlet == 0 || p->has_item(lead.invlet)) && iter < inv_chars.size()) {
     lead.invlet = g->nextinv;
@@ -4002,7 +4002,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
       p->volume_carried() + lead.volume() < p->volume_capacity() && iter < inv_chars.size()) {
     p->i_add(lead);}
     else
-   g->m.add_item(p->posx, p->posy, lead);
+   g->m.add_item_or_charges(p->posx, p->posy, lead);
 
   p->practice(g->turn, "gun", rng(1, multiply / 5 + 1));
 }
@@ -4509,7 +4509,7 @@ void iuse::spray_can(game *g, player *p, item *it, bool t)
             g->add_msg(
                 ismarker?
                 _("You write a message on the ground.") :
-                _("You spray a message on the ground.") 
+                _("You spray a message on the ground.")
             );
         }
         else
@@ -4517,7 +4517,7 @@ void iuse::spray_can(game *g, player *p, item *it, bool t)
             g->add_msg(
                 ismarker?
                 _("You fail to write a message here.") :
-                _("You fail to spray a message here.") 
+                _("You fail to spray a message here.")
             );
 
             // Refuned the charges, because the grafitti failed.
@@ -4557,23 +4557,25 @@ void iuse::heatpack(game *g, player *p, item *it, bool t)
 
 void iuse::dejar(game *g, player *p, item *it, bool t)
 {
-	g->add_msg_if_player(p,_("You open the jar, exposing it to the atmosphere."));
-	itype_id ujfood = (it->type->id).substr(4);  // assumes "jar_" is at front of itype_id and removes it
-	item ujitem(g->itypes[ujfood],0);  // temp create item to discover container
-	itype_id ujcont = (dynamic_cast<it_comest*>(ujitem.type))->container;  //discovering container
-	it->make(g->itypes[ujcont]);  //turning "sealed jar of xxx" into container for "xxx"
-    it->contents.push_back(item(g->itypes[ujfood],0));  //shoving the "xxx" into the container
-    it->contents[0].bday = g->turn + 3600 - (g->turn % 3600);
-}
+    if( (it->type->id).substr(0,4) == "jar_" ) {
+        g->add_msg_if_player(p,_("You open the jar, exposing it to the atmosphere."));
+    } else if( (it->type->id).substr(0,4) == "bag_" ) {
+        g->add_msg_if_player(p,_("You open the vacuum pack, exposing it to the atmosphere."));
+    } else {
+        // No matching substring, bail out.
+        return;
+    }
 
-void iuse::devac(game *g, player *p, item *it, bool t)
-{
-	g->add_msg_if_player(p,_("You open the vacuum pack, exposing it to the atmosphere."));
-	itype_id uvfood = (it->type->id).substr(4);  // assumes "bag_" is at front of itype_id and removes it
-	item uvitem(g->itypes[uvfood],0);  // temp create item to discover container
-	itype_id uvcont = (dynamic_cast<it_comest*>(uvitem.type))->container;  //discovering container
-	it->make(g->itypes[uvcont]);  //turning "vacuum packed xxx" into container for "xxx"
-    it->contents.push_back(item(g->itypes[uvfood],0));  //shoving the "xxx" into the container
+    // Strips off "jar_" or "bag_" from the id to get the content type.
+    itype_id ujfood = (it->type->id).substr(4);
+    // temp create item to discover container
+    item ujitem( g->itypes[ujfood], 0 );
+    //discovering container
+    itype_id ujcont = (dynamic_cast<it_comest*>(ujitem.type))->container;
+    //turning "sealed jar of xxx" into container for "xxx"
+    it->make( g->itypes[ujcont] );
+    //shoving the "xxx" into the container
+    it->contents.push_back( item( g->itypes[ujfood], 0 ) );
     it->contents[0].bday = g->turn + 3600 - (g->turn % 3600);
 }
 

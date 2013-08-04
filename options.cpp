@@ -288,6 +288,9 @@ option_key lookup_option_key(std::string id)
     if(id == "viewport_y") {
         return OPT_VIEWPORT_Y;
     }
+    if(id == "sidebar_style") {
+        return OPT_SIDEBAR_STYLE;
+    }
     if(id == "move_view_offset") {
         return OPT_MOVE_VIEW_OFFSET;
     }
@@ -327,6 +330,9 @@ option_key lookup_option_key(std::string id)
     if(id == "auto_pickup_safemode") {
         return OPT_AUTO_PICKUP_SAFEMODE;
     }
+    if(id == "sort_crafting") {
+        return OPT_SORT_CRAFTING;
+    }
 
     return OPT_NULL;
 }
@@ -359,6 +365,7 @@ std::string option_string(option_key key)
     case OPT_INITIAL_TIME:        return "initial_time";
     case OPT_VIEWPORT_X:          return "viewport_x";
     case OPT_VIEWPORT_Y:          return "viewport_y";
+    case OPT_SIDEBAR_STYLE:       return "sidebar_style";
     case OPT_MOVE_VIEW_OFFSET:    return "move_view_offset";
     case OPT_STATIC_SPAWN:        return "static_spawn";
     case OPT_CLASSIC_ZOMBIES:     return "classic_zombies";
@@ -372,6 +379,7 @@ std::string option_string(option_key key)
     case OPT_AUTO_PICKUP:         return "auto_pickup";
     case OPT_AUTO_PICKUP_ZERO:    return "auto_pickup_zero";
     case OPT_AUTO_PICKUP_SAFEMODE:return "auto_pickup_safemode";
+    case OPT_SORT_CRAFTING:       return "sort_crafting";
     default:                      return "unknown_option";
     }
     return "unknown_option";
@@ -398,13 +406,14 @@ std::string option_desc(option_key key)
     case OPT_CIRCLEDIST:          return _("If true, the game will calculate\nrange in a realistic way:\nlight sources will be circles\ndiagonal movement will\ncover more ground and take\nlonger.\nIf disabled, everything is\nsquare: moving to the northwest\ncorner of a building\ntakes as long as moving\nto the north wall.");
     case OPT_QUERY_DISASSEMBLE:   return _("If true, will query before\ndisassembling items.\nDefault is true");
     case OPT_DROP_EMPTY:          return _("Set to drop empty containers after\nuse.\n0 - don't drop any (default)\n1 - all except watertight containers\n2 - all containers");
-    case OPT_SKILL_RUST:          return _("Set the level of skill rust.\n0 - vanilla Cataclysm (default)\n1 - capped at skill levels\n2 - none at all");
+    case OPT_SKILL_RUST:          return _("Set the level of skill rust.\n0 - vanilla Cataclysm (default)\n1 - capped at skill levels\n2 - intelligence dependent\n3 - intelligence dependent, capped\n4 - none at all");
     case OPT_DELETE_WORLD:        return _("Delete saves upon player death.\n0 - no (default)\n1 - yes\n2 - query");
     case OPT_INITIAL_POINTS:      return _("Initial points available on character\ngeneration.\nDefault is 6");
     case OPT_MAX_TRAIT_POINTS:    return _("Maximum trait points available for\ncharacter generation.\nDefault is 12");
     case OPT_INITIAL_TIME:        return _("Initial starting time of day on\ncharacter generation.\nDefault is 8:00");
     case OPT_VIEWPORT_X:          return _("WINDOWS ONLY: Set the expansion of the\nviewport along the X axis.\nRequires restart.\nDefault is 12.\nPOSIX systems will use terminal size\nat startup.");
     case OPT_VIEWPORT_Y:          return _("WINDOWS ONLY: Set the expansion of the\nviewport along the Y axis.\nRequires restart.\nDefault is 12.\nPOSIX systems will use terminal size\nat startup.");
+    case OPT_SIDEBAR_STYLE:       return _("Sidebar style. 0 is standard,\n1 is narrower and taller.");
     case OPT_MOVE_VIEW_OFFSET:    return _("Move view by how many squares per\nkeypress.\nDefault is 1");
     case OPT_SEASON_LENGTH:       return _("Season length, in days.\nDefault is 14");
     case OPT_STATIC_SPAWN:        return _("Spawn zombies at game start instead of\nduring game. Must reset world\ndirectory after changing for it to\ntake effect.\nDefault is true");
@@ -418,6 +427,7 @@ std::string option_desc(option_key key)
     case OPT_AUTO_PICKUP:         return _("Enable item auto pickup. Change\npickup rules with the Auto Pickup\nManager in the Help Menu ?3");
     case OPT_AUTO_PICKUP_ZERO:    return _("Auto pickup items with\n0 Volume or Weight");
     case OPT_AUTO_PICKUP_SAFEMODE:return _("Auto pickup is disabled\nas long as you can see\nmonsters nearby.\n\nThis is affected by\nSafemode proximity distance.");
+    case OPT_SORT_CRAFTING:       return _("If true, the crafting menus\nwill display recipes that you can\ncraft before other recipes");
     default:                      return " ";
     }
     return "Big ol Bug (options.cpp:option_desc)";
@@ -451,6 +461,7 @@ std::string option_name(option_key key)
     case OPT_INITIAL_TIME:        return _("Initial time");
     case OPT_VIEWPORT_X:          return _("Viewport width");
     case OPT_VIEWPORT_Y:          return _("Viewport height");
+    case OPT_SIDEBAR_STYLE:       return _("Sidebar style");
     case OPT_MOVE_VIEW_OFFSET:    return _("Move view offset");
     case OPT_STATIC_SPAWN:        return _("Static spawn");
     case OPT_CLASSIC_ZOMBIES:     return _("Classic zombies");
@@ -464,6 +475,7 @@ std::string option_name(option_key key)
     case OPT_AUTO_PICKUP:         return _("Enable item Auto Pickup");
     case OPT_AUTO_PICKUP_ZERO:    return _("Auto Pickup 0 Vol/Weight");
     case OPT_AUTO_PICKUP_SAFEMODE:return _("Auto Pickup Safemode");
+    case OPT_SORT_CRAFTING:       return _("Sort Crafting menu");
     default:                      return "Unknown Option (options.cpp:option_name)";
     }
     return "Big ol Bug (options.cpp:option_name)";
@@ -483,6 +495,7 @@ bool option_is_bool(option_key id)
     case OPT_INITIAL_TIME:
     case OPT_VIEWPORT_X:
     case OPT_VIEWPORT_Y:
+    case OPT_SIDEBAR_STYLE:
     case OPT_SEASON_LENGTH:
     case OPT_MOVE_VIEW_OFFSET:
     case OPT_AUTOSAVE_TURNS:
@@ -664,6 +677,8 @@ auto_pickup F\n\
 auto_pickup_zero F\n\
 # Auto pickup is disabled as long as you can see monsters nearby.\n\
 auto_pickup_safemode F\n\
+# Sort the crafting menu so things you can craft are at the front of the menu\n\
+sort_crafting T\n\
 ";
     fout.close();
 }
