@@ -16,7 +16,7 @@
 
 // mfb(n) converts a flag to its appropriate position in covers's bitfield
 #ifndef mfb
-#define mfb(n) long(1 << (n))
+#define mfb(n) static_cast <unsigned long> (1 << (n))
 #endif
 
 static void add_or_drop_item(game *g, player *p, item *it)
@@ -176,7 +176,7 @@ bool use_healing_item(game *g, player *p, item *it, int normal_power, int head_p
                       int torso_power, std::string item_name, std::string special_action)
 {
     int bonus = p->skillLevel("firstaid");
-    hp_part healed;
+    hp_part healed = num_hp_parts;
 
     if (p->is_npc()) { // NPCs heal whichever has sustained the most damage
         int highest_damage = 0;
@@ -779,6 +779,7 @@ void iuse::marloss(game *g, player *p, item *it, bool t)
   return;
 // If we have the marloss in our veins, we are a "breeder" and will spread
 // alien lifeforms.
+ p->add_memorial_log("Ate a marloss berry.");
  if (p->has_trait(PF_MARLOSS)) {
   g->add_msg_if_player(p,_("As you eat the berry, you have a near-religious experience, feeling at one with your surroundings..."));
   p->add_morale(MORALE_MARLOSS, 100, 1000);
@@ -953,7 +954,7 @@ void iuse::sew(game *g, player *p, item *it, bool t)
     if (fix->made_of("cotton") || fix->made_of("wool"))
     {
         repair_items.push_back("rag");
-        plurals.push_back(_("<plural>rags"));
+        plurals.push_back(rm_prefix(_("<plural>rags")));
     }
     if (fix->made_of("leather"))
     {
@@ -1908,6 +1909,7 @@ void iuse::noise_emitter_on(game *g, player *p, item *it, bool t)
     if (t) // Normal use
     {
         point pos = g->find_item(it);
+        //~ the sound of a noise emitter when turned on
         g->sound(pos.x, pos.y, 30, _("KXSHHHHRRCRKLKKK!"));
     }
     else // Turning it off
@@ -2083,7 +2085,7 @@ void iuse::crowbar(game *g, player *p, item *it, bool t)
   ter_id type = g->m.ter(dirx, diry);
   const char *succ_action;
   const char *fail_action;
-  ter_id new_type;
+  ter_id new_type = t_null;
   bool noisy;
   int difficulty;
 
@@ -2189,7 +2191,7 @@ void iuse::crowbar(game *g, player *p, item *it, bool t)
 
 void iuse::makemound(game *g, player *p, item *it, bool t)
 {
- if (g->m.has_flag(diggable, p->posx, p->posy)) {
+ if (g->m.has_flag(diggable, p->posx, p->posy) && !g->m.has_flag(plant, p->posx, p->posy)) {
   g->add_msg_if_player(p,_("You churn up the earth here."));
   p->moves = -300;
   g->m.ter_set(p->posx, p->posy, t_dirtmound);
@@ -2250,6 +2252,296 @@ void iuse::chainsaw_on(game *g, player *p, item *it, bool t)
  }
 }
 
+void iuse::shishkebab_off(game *g, player *p, item *it, bool t)
+{
+    int choice = menu(true,
+                      _("What's the plan?"), _("Bring the heat!"), _("Cut 'em up!"), _("I'm good."), NULL);
+    switch (choice)
+    {
+        if (choice == 2)
+            break;
+    case 1:
+    {
+        p->moves -= 10;
+        if (rng(0, 10) - it->damage > 5 && it->charges > 0)
+        {
+            g->sound(p->posx, p->posy, 10,
+                     _("Let's dance Zeds!"));
+            it->make(g->itypes["shishkebab_on"]);
+            it->active = true;
+        }
+
+        else
+            g->add_msg_if_player(p,_("Aw, dangit."));
+    }
+    break;
+    case 2:
+    {
+        iuse::knife(g, p, it, t);
+    }
+    }
+}
+void iuse::shishkebab_on(game *g, player *p, item *it, bool t)
+{
+    if (t)   	// Effects while simply on
+    {
+        if (one_in(25))
+            g->sound(p->posx, p->posy, 10, _("Your shishkebab crackles!"));
+
+        if (one_in(75))
+        {
+            g->add_msg_if_player(p,_("Bummer man, wipeout!")),
+              it->make(g->itypes["shishkebab_off"]),
+              it->active = false;
+        }
+    }
+    else if (it->charges == 0)
+    {
+        g->add_msg_if_player(p,_("Uncool, outta gas."));
+        it->make(g->itypes["shishkebab_off"]);
+        it->active = false;
+    }
+    else
+    {
+        int choice = menu(true,
+                          _("What's the plan?"), _("Chill out"), _("Torch something!"), _("Keep groovin'"), NULL);
+        switch (choice)
+        {
+            if (choice == 2)
+                break;
+        case 1:
+        {
+            g->add_msg_if_player(p,_("Peace out."));
+            it->make(g->itypes["shishkebab_off"]);
+            it->active = false;
+        }
+        break;
+        case 2:
+        {
+            int dirx, diry;
+            if (prep_firestarter_use(g, p, it, dirx, diry))
+            {
+                p->moves -= 5;
+                resolve_firestarter_use(g, p, it, dirx, diry);
+            }
+        }
+        }
+    }
+}
+
+void iuse::firemachete_off(game *g, player *p, item *it, bool t)
+{
+    int choice = menu(true,
+                      _("No. 9"), _("Turn on"), _("Use as a knife"), _("Cancel"), NULL);
+    switch (choice)
+    {
+        if (choice == 2)
+            break;
+    case 1:
+    {
+        p->moves -= 10;
+        if (rng(0, 10) - it->damage > 2 && it->charges > 0)
+        {
+            g->sound(p->posx, p->posy, 10,
+                     _("Your No. 9 glows!"));
+            it->make(g->itypes["firemachete_on"]);
+            it->active = true;
+        }
+
+        else
+            g->add_msg_if_player(p,_("Click."));
+    }
+    break;
+    case 2:
+    {
+        iuse::knife(g, p, it, t);
+    }
+    }
+}
+void iuse::firemachete_on(game *g, player *p, item *it, bool t)
+{
+    if (t)   	// Effects while simply on
+    {
+        if (one_in(25))
+            g->sound(p->posx, p->posy, 5, _("Your No. 9 hisses."));
+        if (one_in(100))
+        {
+            g->add_msg_if_player(p,_("Your No. 9 cuts out!")),
+              it->make(g->itypes["firemachete_off"]),
+              it->active = false;
+        }
+    }
+    else if (it->charges == 0)
+    {
+        g->add_msg_if_player(p,_("Out of ammo!"));
+        it->make(g->itypes["firemachete_off"]);
+        it->active = false;
+    }
+    else
+    {
+        int choice = menu(true, _("No. 9"), _("Turn off"), _("Light something"), _("Cancel"), NULL);
+        switch (choice)
+        {
+            if (choice == 2)
+                break;
+        case 1:
+        {
+            g->add_msg_if_player(p,_("Your No. 9 goes dark."));
+            it->make(g->itypes["firemachete_off"]);
+            it->active = false;
+        }
+        break;
+        case 2:
+        {
+            int dirx, diry;
+            if (prep_firestarter_use(g, p, it, dirx, diry))
+            {
+                p->moves -= 5;
+                resolve_firestarter_use(g, p, it, dirx, diry);
+            }
+        }
+        }
+    }
+}
+
+void iuse::broadfire_off(game *g, player *p, item *it, bool t)
+{
+    int choice = menu(true,
+                      _("What will thou do?"), _("Ready for battle!"), _("Perform peasant work?"), _("Reconsider thy strategy"), NULL);
+    switch (choice)
+    {
+        if (choice == 2)
+            break;
+    case 1:
+    {
+        p->moves -= 10;
+        if (it->charges > 0)
+        {
+            g->sound(p->posx, p->posy, 10,
+                     _("Charge!!"));
+            it->make(g->itypes["broadfire_on"]);
+            it->active = true;
+        }
+        else
+            g->add_msg_if_player(p,_("No strength to fight!"));
+    }
+    break;
+    case 2:
+    {
+        iuse::knife(g, p, it, t);
+    }
+    }
+}
+void iuse::broadfire_on(game *g, player *p, item *it, bool t)
+{
+    if (t)   	// Effects while simply on
+    {
+        if (one_in(35))
+            g->add_msg_if_player(p,_("Your blade burns for combat!"));
+    }
+    else if (it->charges == 0)
+    {
+        g->add_msg_if_player(p,_("Thy strength fades!"));
+        it->make(g->itypes["broadfire_off"]);
+        it->active = false;
+    }
+    else
+    {
+        int choice = menu(true,
+                          _("What will thou do?"), _("Retreat!"), _("Burn and Pillage!"), _("Keep Fighting!"), NULL);
+        switch (choice)
+        {
+            if (choice == 2)
+                break;
+        case 1:
+        {
+            g->add_msg_if_player(p,_("Run away!"));
+            it->make(g->itypes["broadfire_off"]);
+            it->active = false;
+        }
+        break;
+        case 2:
+        {
+            int dirx, diry;
+            if (prep_firestarter_use(g, p, it, dirx, diry))
+            {
+                p->moves -= 5;
+                resolve_firestarter_use(g, p, it, dirx, diry);
+            }
+        }
+        }
+    }
+}
+
+void iuse::firekatana_off(game *g, player *p, item *it, bool t)
+{
+    int choice = menu(true,
+                      _("The Dark of Night."), _("Daybreak"), _("The Moonlight's Edge"), _("Eternal Night"), NULL);
+    switch (choice)
+    {
+        if (choice == 2)
+            break;
+    case 1:
+    {
+        p->moves -= 10;
+        if (it->charges > 0)
+        {
+            g->sound(p->posx, p->posy, 10,
+                     _("The Sun rises."));
+            it->make(g->itypes["firekatana_on"]);
+            it->active = true;
+        }
+        else
+            g->add_msg_if_player(p,_("Time stands still."));
+    }
+    break;
+    case 2:
+    {
+        iuse::knife(g, p, it, t);
+    }
+    }
+}
+void iuse::firekatana_on(game *g, player *p, item *it, bool t)
+{
+    if (t)   	// Effects while simply on
+    {
+        if (one_in(35))
+            g->add_msg_if_player(p,_("The Sun shines brightly."));
+    }
+    else if (it->charges == 0)
+    {
+        g->add_msg_if_player(p,_("The Light Fades."));
+        it->make(g->itypes["firekatana_off"]);
+        it->active = false;
+    }
+    else
+    {
+        int choice = menu(true,
+                          _("The Light of Day."), _("Nightfall"), _("Blazing Heat"), _("Endless Day"), NULL);
+        switch (choice)
+        {
+            if (choice == 2)
+                break;
+        case 1:
+        {
+            g->add_msg_if_player(p,_("The Sun sets."));
+            it->make(g->itypes["firekatana_off"]);
+            it->active = false;
+        }
+        break;
+        case 2:
+        {
+            int dirx, diry;
+            if (prep_firestarter_use(g, p, it, dirx, diry))
+            {
+                p->moves -= 5;
+                resolve_firestarter_use(g, p, it, dirx, diry);
+            }
+        }
+        }
+    }
+}
+
 void iuse::jackhammer(game *g, player *p, item *it, bool t)
 {
  int dirx, diry;
@@ -2265,6 +2557,7 @@ void iuse::jackhammer(game *g, player *p, item *it, bool t)
      g->m.ter(dirx, diry) != t_tree) {
   g->m.destroy(g, dirx, diry, false);
   p->moves -= 500;
+  //~ the sound of a jackhammer
   g->sound(dirx, diry, 45, _("TATATATATATATAT!"));
  } else if (g->m.move_cost(dirx, diry) == 2 && g->levz != -1 &&
             g->m.ter(dirx, diry) != t_dirt && g->m.ter(dirx, diry) != t_grass) {
@@ -2298,6 +2591,7 @@ void iuse::jacqueshammer(game *g, player *p, item *it, bool t)
      g->m.ter(dirx, diry) != t_tree) {
   g->m.destroy(g, dirx, diry, false);
   p->moves -= 500;
+  //~ the sound of a "jaqueshammer"
   g->sound(dirx, diry, 45, _("OHOHOHOHOHOHOHOHO!"));
  } else if (g->m.move_cost(dirx, diry) == 2 && g->levz != -1 &&
             g->m.ter(dirx, diry) != t_dirt && g->m.ter(dirx, diry) != t_grass) {
@@ -2343,7 +2637,7 @@ void iuse::set_trap(game *g, player *p, item *it, bool t)
  bool buried = false;
  bool set = false;
  std::stringstream message;
- int practice;
+ int practice = 0;
 
 if(it->type->id == "cot"){
   message << _("You unfold the cot and place it on the ground.");
@@ -2505,7 +2799,7 @@ void iuse::geiger(game *g, player *p, item *it, bool t)
   else if (rads > 8)
    g->add_msg(_("The geiger counter clicks slowly."));
   else if (rads > 4)
-   g->add_msg(_("The geiger counter clicks intermittantly."));
+   g->add_msg(_("The geiger counter clicks intermittently."));
   else
    g->add_msg(_("The geiger counter clicks once."));
   return;
@@ -2606,7 +2900,8 @@ void iuse::pipebomb_act(game *g, player *p, item *it, bool t)
  if (pos.x == -999 || pos.y == -999)
   return;
  if (t) // Simple timer effects
-  g->sound(pos.x, pos.y, 0, _("Ssssss"));	// Vol 0 = only heard if you hold it
+  //~ the sound of a lit fuse
+  g->sound(pos.x, pos.y, 0, _("ssss..."));	// Vol 0 = only heard if you hold it
  else {	// The timer has run down
   if (one_in(10) && g->u_see(pos.x, pos.y))
    g->add_msg(_("The pipe bomb fizzles out."));
@@ -3129,7 +3424,10 @@ void iuse::UPS_off(game *g, player *p, item *it, bool t)
 void iuse::UPS_on(game *g, player *p, item *it, bool t)
 {
  if (t) {	// Normal use
-   if (p->worn.size() && p->worn[0].type->is_power_armor()) {
+   if (p->worn.size() && p->worn[0].type->is_power_armor() &&
+       !p->has_active_bionic("bio_power_armor_interface") &&
+       !p->has_active_bionic("bio_power_armor_interface_mkII") &&
+       !p->has_active_item("adv_UPS_on")) { // Use better power sources first
      it->charges -= 4;
 
      if (it->charges < 0) {
@@ -3163,8 +3461,10 @@ void iuse::adv_UPS_off(game *g, player *p, item *it, bool t)
 void iuse::adv_UPS_on(game *g, player *p, item *it, bool t)
 {
  if (t) {	// Normal use
-   if (p->worn.size() && p->worn[0].type->is_power_armor()) {
-     it->charges -= 2;
+   if (p->worn.size() && p->worn[0].type->is_power_armor() &&
+       !p->has_active_bionic("bio_power_armor_interface") &&
+       !p->has_active_bionic("bio_power_armor_interface_mkII")) {
+     it->charges -= 2; // Use better power sources first
 
      if (it->charges < 0) {
        it->charges = 0;
@@ -3288,6 +3588,24 @@ void iuse::mp3_on(game *g, player *p, item *it, bool t)
   it->make(g->itypes["mp3"]);
   it->active = false;
  }
+}
+
+void iuse::portable_game(game *g, player *p, item *it, bool t)
+{
+  if(p->has_trait(PF_ILLITERATE)) {
+    g->add_msg(_("You're illiterate!"));
+  } else if(it->charges == 0) {
+    g->add_msg_if_player(p,_("The %s's batteries are dead."), it->name.c_str());
+  } else {
+
+    //Play in 15-minute chunks
+    int time = 15000;
+
+    g->add_msg_if_player(p, _("You play on your %s for a while."), it->name.c_str());
+    p->assign_activity(g, ACT_GAME, time, -1, it->invlet, "gaming");
+    p->moves = 0;
+
+  }
 }
 
 void iuse::vortex(game *g, player *p, item *it, bool t)
@@ -3975,7 +4293,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
     casing.invlet = g->nextinv;
     g->advance_nextinv();
     iter++;}
-    if (p->can_pickWeight(casing.weight(), !OPTIONS[OPT_DANGEROUS_PICKUPS]) &&
+    if (p->can_pickWeight(casing.weight(), !OPTIONS["DANGEROUS_PICKUPS"]) &&
       p->can_pickVolume(casing.volume()) && iter < inv_chars.size()) {
     p->i_add(casing);}
     else
@@ -3987,7 +4305,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
     primer.invlet = g->nextinv;
     g->advance_nextinv();
     iter++;}
-    if (p->can_pickWeight(primer.weight(), !OPTIONS[OPT_DANGEROUS_PICKUPS]) &&
+    if (p->can_pickWeight(primer.weight(), !OPTIONS["DANGEROUS_PICKUPS"]) &&
       p->can_pickVolume(primer.volume()) && iter < inv_chars.size()) {
     p->i_add(primer);}
     else
@@ -3997,7 +4315,7 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
     gunpowder.invlet = g->nextinv;
     g->advance_nextinv();
     iter++;}
-    if (p->can_pickWeight(gunpowder.weight(), !OPTIONS[OPT_DANGEROUS_PICKUPS]) &&
+    if (p->can_pickWeight(gunpowder.weight(), !OPTIONS["DANGEROUS_PICKUPS"]) &&
       p->can_pickVolume(gunpowder.volume()) && iter < inv_chars.size()) {
     p->i_add(gunpowder);}
     else
@@ -4007,13 +4325,13 @@ void iuse::bullet_puller(game *g, player *p, item *it, bool t)
     lead.invlet = g->nextinv;
     g->advance_nextinv();
     iter++;}
-    if (p->can_pickWeight(lead.weight(), !OPTIONS[OPT_DANGEROUS_PICKUPS]) &&
+    if (p->can_pickWeight(lead.weight(), !OPTIONS["DANGEROUS_PICKUPS"]) &&
       p->can_pickVolume(lead.volume()) && iter < inv_chars.size()) {
     p->i_add(lead);}
     else
    g->m.add_item_or_charges(p->posx, p->posy, lead);
 
-  p->practice(g->turn, "gun", rng(1, multiply / 5 + 1));
+  p->practice(g->turn, "fabrication", rng(1, multiply / 5 + 1));
 }
 
 void iuse::boltcutters(game *g, player *p, item *it, bool t)

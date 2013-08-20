@@ -13,7 +13,7 @@
 
 // mfb(n) converts a flag to its appropriate position in covers's bitfield
 #ifndef mfb
-#define mfb(n) long(1 << (n))
+#define mfb(n) static_cast <unsigned long> (1 << (n))
 #endif
 
 std::string default_technique_name(technique_id tech);
@@ -250,6 +250,7 @@ bool item::stacks_with(item rhs)
  bool stacks = (type   == rhs.type   && damage  == rhs.damage  &&
                 active == rhs.active && charges == rhs.charges &&
                 item_tags == rhs.item_tags &&
+                item_vars == rhs.item_vars &&
                 contents.size() == rhs.contents.size() &&
                 (!goes_bad() || bday == rhs.bday));
 
@@ -850,7 +851,7 @@ std::string item::tname(game *g)
    }
   }
  }
- 
+
  std::string vehtext = "";
  if (is_var_veh_part()){
   if(type->bigness_aspect == BIGNESS_ENGINE_DISPLACEMENT){ //liters, e.g. "3.21-Liter V8 engine"
@@ -863,7 +864,7 @@ std::string item::tname(game *g)
    vehtext = rmp_format(_("<veh_adj>%d\" "), bigness);
   }
  }
- 
+
  std::string burntext = "";
  if (volume() >= 4 && burnt >= volume() * 2)
   burntext = rm_prefix(_("<burnt_adj>badly burnt "));
@@ -937,7 +938,11 @@ std::string item::tname(game *g)
 
  ret << damtext << vehtext << burntext << maintext << tagtext;
 
- return ret.str();
+ if (item_vars.size()) {
+  return "*" + ret.str() + "*";
+ } else {
+  return ret.str();
+ }
 }
 
 nc_color item::color() const
@@ -964,7 +969,7 @@ int item::price() const
 int item::weight() const
 {
     if (typeId() == "corpse") {
-        int ret;
+        int ret = 0;
         switch (corpse->size) {
             case MS_TINY:   ret =   1000;  break;
             case MS_SMALL:  ret =  40750;  break;
@@ -1153,7 +1158,7 @@ bool item::rotten(game *g)
 
 bool item::ready_to_revive(game *g)
 {
-    if (OPTIONS[OPT_REVIVE_ZOMBIES]) {
+    if (OPTIONS["REVIVE_ZOMBIES"]) {
         if (type->id != "corpse" || corpse->species != species_zombie || damage >= 4)
         {
             return false;
