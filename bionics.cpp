@@ -126,8 +126,8 @@ void player::power_bionics(game *g)
  wrefresh(wBio);
  char ch;
  bool activating = true;
- bionic *tmp;
- int b;
+ bionic *tmp = NULL;
+ int b = 0;
  do {
   ch = getch();
   if (ch == '!') {
@@ -166,7 +166,7 @@ You can not activate %s!  To read a description of \
 // Clear the lines first
      ch = 0;
      werase(w_description);
-     mvwprintz(w_description, 0, 0, c_ltblue, bionics[tmp->id]->description.c_str());
+     fold_and_print(w_description, 0, 0, 78, c_ltblue, bionics[tmp->id]->description.c_str());
     }
    }
   }
@@ -206,7 +206,7 @@ void player::activate_bionic(int b, game *g)
 // Not-on units, or those with zero charge, have to pay the power cost
   if (bionics[bio.id]->charge_time > 0) {
    my_bionics[b].powered = true;
-   my_bionics[b].charge = bionics[bio.id]->charge_time;
+   my_bionics[b].charge = bionics[bio.id]->charge_time - 1;
   }
   power_level -= power_cost;
  }
@@ -499,8 +499,6 @@ bool player::install_bionics(game *g, it_bionic* type)
      }
  }
 
- std::string bio_name = type->name.substr(5);	// Strip off "CBM: "
- 
  int pl_skill = int_cur * 4 +
    skillLevel("electronics") * 4 +
    skillLevel("firstaid")    * 3 +
@@ -575,14 +573,13 @@ void bionics_install_failure(game *g, player *u, it_bionic* type, int success)
   g->add_msg(_("The installation fails without incident."));
   return;
  }
- std::string fail_text;
 
  switch (rng(1, 5)) {
-  case 1: fail_text = _("You flub the installation");	break;
-  case 2: fail_text = _("You mess up the installation");	break;
-  case 3: fail_text = _("The installation fails");		break;
-  case 4: fail_text = _("The installation is a failure");	break;
-  case 5: fail_text = _("You screw up the installation");	break;
+  case 1: g->add_msg(_("You flub the installation.")); break;
+  case 2: g->add_msg(_("You mess up the installation.")); break;
+  case 3: g->add_msg(_("The installation fails.")); break;
+  case 4: g->add_msg(_("The installation is a failure.")); break;
+  case 5: g->add_msg(_("You screw up the installation.")); break;
  }
 
  if (fail_type == 3 && u->my_bionics.size() == 0)
@@ -591,17 +588,21 @@ void bionics_install_failure(game *g, player *u, it_bionic* type, int success)
  switch (fail_type) {
 
  case 1:
-  fail_text += _(", causing great pain.");
+  g->add_msg(_("It really hurts!"));
   u->pain += rng(failure_level * 3, failure_level * 6);
   break;
 
  case 2:
-  fail_text += _(" and your body is damaged.");
+  g->add_msg(_("Your body is damaged!"));
   u->hurtall(rng(failure_level, failure_level * 2));
   break;
 
  case 3:
-  fail_text += (u->my_bionics.size() <= failure_level ? _(" and all of your existing bionics are lost.") : _(" and some of your existing bionics are lost."));
+  if (u->my_bionics.size() <= failure_level) {
+    g->add_msg(_("All of your existing bionics are lost!"));
+  } else {
+    g->add_msg(_("Some of your existing bionics are lost!"));
+  }
   for (int i = 0; i < failure_level && u->my_bionics.size() > 0; i++) {
    int rem = rng(0, u->my_bionics.size() - 1);
    u->my_bionics.erase(u->my_bionics.begin() + rem);
@@ -609,25 +610,23 @@ void bionics_install_failure(game *g, player *u, it_bionic* type, int success)
   break;
 
  case 4:
-  fail_text += _(" and do damage to your genetics, causing mutation.");
-  g->add_msg(fail_text.c_str()); // Failure text comes BEFORE mutation text
+  g->add_msg(_("You do damage to your genetics, causing mutation!"));
   while (failure_level > 0) {
    u->mutate(g);
    failure_level -= rng(1, failure_level + 2);
   }
-  return;	// So the failure text doesn't show up twice
   break;
 
  case 5:
  {
-  fail_text += _(", causing a faulty installation.");
+  g->add_msg(_("The installation is faulty!"));
   std::vector<bionic_id> valid;
   for (std::vector<std::string>::iterator it = faulty_bionics.begin() ; it != faulty_bionics.end(); ++it){
    if (!u->has_bionic(*it)){
     valid.push_back(*it);
    }
   }
-  if (valid.size() == 0) {	// We've got all the bad bionics!
+  if (valid.size() == 0) { // We've got all the bad bionics!
    if (u->max_power_level > 0) {
     g->add_msg(_("You lose power capacity!"));
     u->max_power_level = rng(0, u->max_power_level - 1);
@@ -640,9 +639,6 @@ void bionics_install_failure(game *g, player *u, it_bionic* type, int success)
  }
   break;
  }
-
- g->add_msg(fail_text.c_str());
-
 }
 
 void game::init_bionics() throw (std::string)
@@ -667,10 +663,10 @@ void game::init_bionics() throw (std::string)
 
         // set up all the bionic parameters
         std::string id          = bio.get("id").as_string();
-        std::string name        = bio.get("name").as_string();
+        std::string name        = _(bio.get("name").as_string().c_str());
         int cost                = bio.get("cost").as_int();
         int time                = bio.get("time").as_int();
-        std::string description = bio.get("description").as_string();
+        std::string description = _(bio.get("description").as_string().c_str());
         bool faulty             = (tags.find("FAULTY") != tags.end());
         bool powersource        = (tags.find("POWER") != tags.end());
         bool active             = (tags.find("ACTIVE") != tags.end());

@@ -58,7 +58,7 @@ enum oter_id {
  ot_house_north, ot_house_east, ot_house_south, ot_house_west,
  ot_house_base_north, ot_house_base_east, ot_house_base_south,
   ot_house_base_west,
- ot_s_lot, ot_park,
+ ot_s_lot, ot_park, ot_pool,
  ot_s_gas_north, ot_s_gas_east, ot_s_gas_south, ot_s_gas_west,
  ot_s_pharm_north, ot_s_pharm_east, ot_s_pharm_south, ot_s_pharm_west,
  ot_office_doctor_north, ot_office_doctor_east, ot_office_doctor_south, ot_office_doctor_west,
@@ -112,6 +112,7 @@ enum oter_id {
 // Goodies/dungeons
  ot_shelter, ot_shelter_under, ot_lmoe, ot_lmoe_under,
  ot_lab, ot_lab_stairs, ot_lab_core, ot_lab_finale,
+ ot_ice_lab, ot_ice_lab_stairs, ot_ice_lab_core, ot_ice_lab_finale,
  ot_nuke_plant_entrance, ot_nuke_plant, // TODO
  ot_bunker, ot_outpost,
  ot_silo, ot_silo_finale,
@@ -225,6 +226,7 @@ enum omspec_id
  OMSPEC_FARM,
  OMSPEC_TEMPLE,
  OMSPEC_LAB,
+ OMSPEC_ICE_LAB,
  OMSPEC_FEMA,
  OMSPEC_BUNKER,
  OMSPEC_OUTPOST,

@@ -155,8 +155,14 @@ std::string npc::save_info()
          " " << oxygen << " " << (marked_for_death ? "1" : "0") << " " <<
          (dead ? "1" : "0") << " " << myclass << " " << patience << " ";
 
- for (int i = 0; i < PF_MAX2; i++)
-  dump << my_traits[i] << " ";
+ for (std::map<std::string, bool>::iterator iter = my_traits.begin(); iter != my_traits.end(); ++iter) {
+    if (iter->second) {
+        dump << iter->first << " ";
+    }
+ }
+
+ dump << "TRAITS_END" << " ";
+
  for (int i = 0; i < num_hp_parts; i++)
   dump << hp_cur[i] << " " << hp_max[i] << " ";
 
@@ -244,8 +250,15 @@ void npc::load_info(game *g, std::string data)
 
  myclass = npc_class(classtmp);
 
- for (int i = 0; i < PF_MAX2; i++)
-  dump >> my_traits[i];
+ std::string sTemp = "";
+ for (int i = 0; i < traits.size(); i++) {
+    dump >> sTemp;
+    if (sTemp == "TRAITS_END") {
+        break;
+    } else {
+        my_traits[sTemp] = true;
+    }
+ }
 
  for (int i = 0; i < num_hp_parts; i++)
   dump >> hp_cur[i] >> hp_max[i];
@@ -430,7 +443,7 @@ void npc::randomize(game *g, npc_class type)
 
  case NC_COWBOY:
   for (std::vector<Skill*>::iterator aSkill = Skill::skills.begin(); aSkill != Skill::skills.end(); ++aSkill) {
-   int level = dice(3, 2) - rng(0, 4);	
+   int level = dice(3, 2) - rng(0, 4);
    if (level < 0)
    {
     level = 0;
@@ -1247,23 +1260,23 @@ void npc::form_opinion(player *u)
    op_of_u.fear++;
  }
 
- if (u->has_trait(PF_PRETTY))
+ if (u->has_trait("PRETTY"))
   op_of_u.fear += 1;
- else if (u->has_trait(PF_BEAUTIFUL))
+ else if (u->has_trait("BEAUTIFUL"))
   op_of_u.fear += 2;
- else if (u->has_trait(PF_BEAUTIFUL2))
+ else if (u->has_trait("BEAUTIFUL2"))
   op_of_u.fear += 3;
- else if (u->has_trait(PF_BEAUTIFUL3))
+ else if (u->has_trait("BEAUTIFUL3"))
   op_of_u.fear += 4;
- else if (u->has_trait(PF_UGLY))
+ else if (u->has_trait("UGLY"))
   op_of_u.fear -= 1;
- else if (u->has_trait(PF_DEFORMED))
+ else if (u->has_trait("DEFORMED"))
   op_of_u.fear += 3;
- else if (u->has_trait(PF_DEFORMED2))
+ else if (u->has_trait("DEFORMED2"))
   op_of_u.fear += 6;
- else if (u->has_trait(PF_DEFORMED3))
+ else if (u->has_trait("DEFORMED3"))
   op_of_u.fear += 9;
- if (u->has_trait(PF_TERRIFYING))
+ if (u->has_trait("TERRIFYING"))
   op_of_u.fear += 6;
 
  if (u->stim > 20)
@@ -1292,21 +1305,21 @@ void npc::form_opinion(player *u)
  if (u->pkill > 30)
   op_of_u.trust -= 1;
 
- if (u->has_trait(PF_PRETTY))
+ if (u->has_trait("PRETTY"))
   op_of_u.trust += 1;
- else if (u->has_trait(PF_BEAUTIFUL))
+ else if (u->has_trait("BEAUTIFUL"))
   op_of_u.trust += 3;
- else if (u->has_trait(PF_BEAUTIFUL2))
+ else if (u->has_trait("BEAUTIFUL2"))
   op_of_u.trust += 5;
- else if (u->has_trait(PF_BEAUTIFUL3))
+ else if (u->has_trait("BEAUTIFUL3"))
   op_of_u.trust += 7;
- else if (u->has_trait(PF_UGLY))
+ else if (u->has_trait("UGLY"))
   op_of_u.trust -= 1;
- else if (u->has_trait(PF_DEFORMED))
+ else if (u->has_trait("DEFORMED"))
   op_of_u.trust -= 3;
- else if (u->has_trait(PF_DEFORMED2))
+ else if (u->has_trait("DEFORMED2"))
   op_of_u.trust -= 6;
- else if (u->has_trait(PF_DEFORMED3))
+ else if (u->has_trait("DEFORMED3"))
   op_of_u.trust -= 9;
 
 // VALUE
@@ -1381,7 +1394,7 @@ int npc::player_danger(player *u)
    ret++;
  }
 
- if (u->has_trait(PF_TERRIFYING))
+ if (u->has_trait("TERRIFYING"))
   ret += 2;
 
  if (u->stim > 20)
@@ -2071,41 +2084,42 @@ void npc::shift(int sx, int sy)
 
 void npc::die(game *g, bool your_fault)
 {
- if (dead)
-  return;
- dead = true;
- if (g->u_see(posx, posy))
-  g->add_msg(_("%s dies!"), name.c_str());
- if (your_fault && !g->u.has_trait(PF_CANNIBAL)) {
-  if (is_friend())
-  {
-   // Very long duration, about 7d, decay starts after 10h.
-   g->u.add_morale(MORALE_KILLED_FRIEND, -500, 0, 10000, 600);
-  }
-  else if (!is_enemy() || this->hit_by_player)
-  {
-   // Very long duration, about 3.5d, decay starts after 5h.
-   g->u.add_morale(MORALE_KILLED_INNOCENT, -100, 0, 5000, 300);
-  }
- }
+    if (dead)
+        return;
+    dead = true;
 
- item my_body;
- my_body.make_corpse(g->itypes["corpse"], g->mtypes[mon_null], g->turn);
- my_body.name = name;
- g->m.add_item_or_charges(posx, posy, my_body);
- std::vector<item *> dump;
- inv.dump(dump);
- for (int i = 0; i < dump.size(); i++)
-     g->m.add_item_or_charges(posx, posy, *(dump[i]));
- for (int i = 0; i < worn.size(); i++)
-  g->m.add_item_or_charges(posx, posy, worn[i]);
- if (weapon.type->id != "null")
-  g->m.add_item_or_charges(posx, posy, weapon);
+    if (in_vehicle)
+        g->m.unboard_vehicle(g, posx, posy);
 
- for (int i = 0; i < g->active_missions.size(); i++) {
-  if (g->active_missions[i].npc_id == getID())
-   g->fail_mission( g->active_missions[i].uid );
- }
+    if (g->u_see(posx, posy))
+        g->add_msg(_("%s dies!"), name.c_str());
+    if (your_fault && !g->u.has_trait("CANNIBAL")){
+        if (is_friend()){
+            // Very long duration, about 7d, decay starts after 10h.
+            g->u.add_morale(MORALE_KILLED_FRIEND, -500, 0, 10000, 600);
+        } else if (!is_enemy() || this->hit_by_player){
+            // Very long duration, about 3.5d, decay starts after 5h.
+            g->u.add_morale(MORALE_KILLED_INNOCENT, -100, 0, 5000, 300);
+        }
+    }
+
+    item my_body;
+    my_body.make_corpse(g->itypes["corpse"], g->mtypes[mon_null], g->turn);
+    my_body.name = name;
+    g->m.add_item_or_charges(posx, posy, my_body);
+    std::vector<item *> dump;
+    inv.dump(dump);
+    for (int i = 0; i < dump.size(); i++)
+        g->m.add_item_or_charges(posx, posy, *(dump[i]));
+    for (int i = 0; i < worn.size(); i++)
+        g->m.add_item_or_charges(posx, posy, worn[i]);
+    if (weapon.type->id != "null")
+        g->m.add_item_or_charges(posx, posy, weapon);
+
+    for (int i = 0; i < g->active_missions.size(); i++) {
+        if (g->active_missions[i].npc_id == getID())
+            g->fail_mission( g->active_missions[i].uid );
+    }
 }
 
 std::string npc_attitude_name(npc_attitude att)

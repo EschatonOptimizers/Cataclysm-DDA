@@ -53,7 +53,7 @@ nc_color hilite(nc_color c)
 
 nc_color invert_color(nc_color c)
 {
- if (OPTIONS[OPT_NO_CBLINK]) {
+ if (OPTIONS["NO_BRIGHT_BACKGROUNDS"]) {
   switch (c) {
    case c_white:
    case c_ltgray:
@@ -477,7 +477,7 @@ void realDebugmsg(const char* filename, const char* line, const char *mes, ...)
 
 bool query_yn(const char *mes, ...)
 {
- bool force_uc = OPTIONS[OPT_FORCE_YN];
+ bool force_uc = OPTIONS["FORCE_CAPITAL_YN"];
  va_list ap;
  va_start(ap, mes);
  char buff[1024];
@@ -1295,7 +1295,7 @@ size_t shortcut_print(WINDOW* w, nc_color color, nc_color colork, const char* fm
     char buff[3000];    //TODO replace Magic Number
     vsprintf(buff, fmt, ap);
     va_end(ap);
-    
+
     std::string tmp = buff;
     size_t pos = tmp.find_first_of('<');
     size_t pos2 = tmp.find_first_of('>');
@@ -1311,7 +1311,7 @@ size_t shortcut_print(WINDOW* w, nc_color color, nc_color colork, const char* fm
     }
     else
     {
-        // no shutcut? 
+        // no shutcut?
         wprintz(w, color, buff);
         len = utf8_width(buff);
     }
